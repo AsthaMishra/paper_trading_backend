@@ -1,0 +1,9 @@
+[package]
+name = "paper-trading-backend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dotenvy = "0.15.7"
+scylla = "1.5.0"
+serde = { version = "1.0.228", features = ["derive"] }
