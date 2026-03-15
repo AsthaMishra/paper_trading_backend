@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use scylla::client::{
-    session::{self, Session},
-    session_builder::SessionBuilder,
-};
+use scylla::client::{session::Session, session_builder::SessionBuilder};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -45,9 +42,27 @@ impl DatabaseConfig {
             let node_addr = format!("{}:{}", host, self.port);
             session_builder = session_builder.known_node(node_addr);
         }
-    
+
         let session: Session = session_builder.build().await?;
+        self.create_keyspace(&session).await?;
+
         session.use_keyspace(&self.keyspace, false).await?;
+
         Ok(Arc::new(session))
+    }
+
+    async fn create_keyspace(&self, session: &Session) -> Result<(), Box<dyn std::error::Error>> {
+        let query = format!(
+            "CREATE KEYSPACE IF NOT EXISTS {}
+            WITH replication = {{
+                'class': 'SimpleStrategy',
+                'replication_factor': '1'
+            }}",
+            self.keyspace
+        );
+
+        session.query_unpaged(query, &[]).await?;
+        println!("✅ Keyspace '{}' ready", self.keyspace);
+        Ok(())
     }
 }
