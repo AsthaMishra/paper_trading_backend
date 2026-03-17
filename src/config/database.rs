@@ -47,7 +47,6 @@ impl DatabaseConfig {
         self.create_keyspace(&session).await?;
 
         session.use_keyspace(&self.keyspace, false).await?;
-
         Ok(Arc::new(session))
     }
 
@@ -66,3 +65,4 @@ impl DatabaseConfig {
         Ok(())
     }
 }
+  
