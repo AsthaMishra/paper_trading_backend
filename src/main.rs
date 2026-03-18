@@ -1,5 +1,4 @@
 use tokio::net::TcpListener;
-
 use axum::{Router, response::IntoResponse, routing::get};
 use paper_trading_backend::{AppConfig, AppState, config::DatabaseConfig};
 use tower_http::cors::CorsLayer;

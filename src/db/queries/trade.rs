@@ -13,7 +13,7 @@ const TRADE: &str = "INSERT INTO paper_trading.trades (
     order_price,
     filled_price,
     total_value,
-    fees,
+    fees
 ) VALUES (?,?,?,?,?,?,?,?,?,?)";
 
 pub struct TradeDB {
@@ -42,7 +42,7 @@ impl TradeDB {
     ) -> Result<(), Box<dyn Error>> {
         session.execute_unpaged(&self.trade, (
             wallet_address,
-            chrono::Utc::now().timestamp(),
+            chrono::Utc::now().timestamp_millis(),
             id,
             asset,
             side,

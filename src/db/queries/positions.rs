@@ -8,27 +8,28 @@ const CREATE_POSITION: &str = "INSERT INTO paper_trading.positions(
     avg_entry_price,
     realized_pnl,
     opened_at,
-    updated_at) VALUES (?,?,?,?,?,?,?,?)
+    updated_at
+) VALUES (?,?,?,?,?,?,?)
 ";
 
-const UPDATE_POSITION: &str = "UPDATE INTO paper_trading.positions
-SET 
+const UPDATE_POSITION: &str = "UPDATE paper_trading.positions
+SET
     quantity = ?,
     avg_entry_price = ?,
-    updated_at = ?,
-    WHERE wallet_address = ?, asset = ?
+    updated_at = ?
+    WHERE wallet_address = ? AND asset = ?
 ";
 
-const PARTIAL_SELL: &str = "UPDATE INTO paper_trading.positions
-SET 
+const PARTIAL_SELL: &str = "UPDATE paper_trading.positions
+SET
     quantity = ?,
     realized_pnl = ?,
-    updated_at = ?,
-    WHERE wallet_address = ?, asset = ?
+    updated_at = ?
+    WHERE wallet_address = ? AND asset = ?
 ";
 
 const FULL_SELL: &str = "DELETE from paper_trading.positions
-WHERE wallet_address = ?, asset = ? ";
+WHERE wallet_address = ? AND asset = ?";
 
 pub struct PositionsDb {
     create_position: PreparedStatement,
@@ -64,8 +65,8 @@ impl PositionsDb {
                     quantity,
                     avg_entry_price,
                     0.0,
-                    chrono::Utc::now().timestamp(),
-                    chrono::Utc::now().timestamp(),
+                    chrono::Utc::now().timestamp_millis(),
+                    chrono::Utc::now().timestamp_millis(),
                 ),
             )
             .await?;
@@ -84,11 +85,11 @@ impl PositionsDb {
             .execute_unpaged(
                 &self.update_position,
                 (
-                    wallet_address,
-                    asset,
                     quantity,
                     avg_entry_price,
-                    chrono::Utc::now().timestamp(),
+                    chrono::Utc::now().timestamp_millis(),
+                    wallet_address,
+                    asset,
                 ),
             )
             .await?;
@@ -107,11 +108,11 @@ impl PositionsDb {
             .execute_unpaged(
                 &self.partial_sell,
                 (
-                    wallet_address,
-                    asset,
                     quantity,
                     realized_pnl,
-                    chrono::Utc::now().timestamp(),
+                    chrono::Utc::now().timestamp_millis(),
+                    wallet_address,
+                    asset,
                 ),
             )
             .await?;
