@@ -6,3 +6,6 @@ pub use state::*;
 
 pub mod models;
 pub use models::*;
+
+pub mod db;
+pub use db::*;
