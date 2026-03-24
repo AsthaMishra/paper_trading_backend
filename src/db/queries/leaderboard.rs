@@ -7,9 +7,9 @@ use crate::Leaderboard;
 const UPSERT_LEADERBOARD_QUERY: &str =
     "INSERT INTO paper_trading.leaderboard (bucket, total_pnl, wallet_address) VALUES (?, ?, ?)";
 
-const GET_LEADERBOARD_QUERY: &str =
-    "SELECT bucket, total_pnl, wallet_address FROM paper_trading.leaderboard WHERE bucket = ? LIMIT ?";
+const GET_LEADERBOARD_QUERY: &str = "SELECT bucket, total_pnl, wallet_address FROM paper_trading.leaderboard WHERE bucket = ? LIMIT ?";
 
+#[derive(Clone)]
 pub struct LeaderboardDb {
     upsert: PreparedStatement,
     get: PreparedStatement,
@@ -29,7 +29,10 @@ impl LeaderboardDb {
         entry: Leaderboard,
     ) -> Result<(), Box<dyn Error>> {
         session
-            .execute_unpaged(&self.upsert, (&entry.bucket, entry.total_pnl, &entry.wallet_address))
+            .execute_unpaged(
+                &self.upsert,
+                (&entry.bucket, entry.total_pnl, &entry.wallet_address),
+            )
             .await?;
         Ok(())
     }

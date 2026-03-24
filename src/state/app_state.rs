@@ -2,13 +2,24 @@ use std::sync::Arc;
 
 use scylla::client::session::Session;
 
+use crate::{LeaderboardService, PortfolioService, TradeService, UserService};
+
+
 #[derive(Clone)]
-pub struct AppState{
-    pub db: Arc<Session>
+pub struct AppState {
+    pub user_service: UserService,
+    pub trade_service: TradeService,
+    pub portfolio_service: PortfolioService,
+    pub leaderboard_service: LeaderboardService,
 }
 
-impl AppState{
-    pub fn new (db: Arc<Session>) -> Self{
-        Self { db }
+impl AppState {
+    pub async fn new(db: Arc<Session>) -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(Self {
+            user_service: UserService::new(db.clone()).await?,
+            trade_service:TradeService::new(db.clone()).await?,
+            portfolio_service:PortfolioService::new(db.clone()).await?,
+            leaderboard_service:LeaderboardService::new(db.clone()).await?,
+        })
     }
 }

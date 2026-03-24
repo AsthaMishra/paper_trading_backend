@@ -31,11 +31,18 @@ SET
 const FULL_SELL: &str = "DELETE from paper_trading.positions
 WHERE wallet_address = ? AND asset = ?";
 
+const GET_POSITION: &str = "SELECT wallet_address, asset, quantity, avg_entry_price, realized_pnl, opened_at, updated_at FROM paper_trading.positions WHERE wallet_address = ? AND asset = ?";
+
+const GET_ALL_POSITIONS: &str = "SELECT wallet_address, asset, quantity, avg_entry_price, realized_pnl, opened_at, updated_at FROM paper_trading.positions WHERE wallet_address = ?";
+
+#[derive(Clone)]
 pub struct PositionsDb {
     create_position: PreparedStatement,
     update_position: PreparedStatement,
     partial_sell: PreparedStatement,
     full_sell: PreparedStatement,
+    get_position: PreparedStatement,
+    get_all_positions: PreparedStatement,
 }
 
 impl PositionsDb {
@@ -45,6 +52,8 @@ impl PositionsDb {
             update_position: session.prepare(UPDATE_POSITION).await?,
             partial_sell: session.prepare(PARTIAL_SELL).await?,
             full_sell: session.prepare(FULL_SELL).await?,
+            get_position: session.prepare(GET_POSITION).await?,
+            get_all_positions: session.prepare(GET_ALL_POSITIONS).await?,
         })
     }
 
@@ -117,6 +126,85 @@ impl PositionsDb {
             )
             .await?;
         Ok(())
+    }
+
+    pub async fn get_position(
+        &self,
+        session: &Session,
+        wallet_address: &str,
+        asset: &str,
+    ) -> Result<Option<crate::Positions>, Box<dyn Error>> {
+        let result = session
+            .execute_unpaged(&self.get_position, (wallet_address, asset))
+            .await?
+            .into_rows_result()?;
+
+        let position = result
+            .rows::<(String, String, f64, f64, f64, i64, i64)>()?
+            .filter_map(|r| r.ok())
+            .map(
+                |(
+                    wallet_address,
+                    asset,
+                    quantity,
+                    avg_entry_price,
+                    realized_pnl,
+                    opened_at,
+                    updated_at,
+                )| {
+                    crate::Positions {
+                        wallet_address,
+                        asset,
+                        quantity,
+                        avg_entry_price,
+                        realized_pnl,
+                        opened_at,
+                        updated_at,
+                    }
+                },
+            )
+            .next();
+
+        Ok(position)
+    }
+
+    pub async fn get_all_positions(
+        &self,
+        session: &Session,
+        wallet_address: &str,
+    ) -> Result<Vec<crate::Positions>, Box<dyn Error>> {
+        let result = session
+            .execute_unpaged(&self.get_all_positions, (wallet_address,))
+            .await?
+            .into_rows_result()?;
+
+        let positions = result
+            .rows::<(String, String, f64, f64, f64, i64, i64)>()?
+            .filter_map(|r| r.ok())
+            .map(
+                |(
+                    wallet_address,
+                    asset,
+                    quantity,
+                    avg_entry_price,
+                    realized_pnl,
+                    opened_at,
+                    updated_at,
+                )| {
+                    crate::Positions {
+                        wallet_address,
+                        asset,
+                        quantity,
+                        avg_entry_price,
+                        realized_pnl,
+                        opened_at,
+                        updated_at,
+                    }
+                },
+            )
+            .collect();
+
+        Ok(positions)
     }
 
     pub async fn full_sell(

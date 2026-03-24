@@ -1,22 +1,30 @@
+use std::sync::Arc;
+
+use axum::{Router, response::IntoResponse, routing::{get, post}};
+use paper_trading_backend::{
+    AppConfig, AppState,
+    config::DatabaseConfig,
+    routes::{self, create_user, execute_trade, get_leaderboard, get_portfolio},
+};
 use tokio::net::TcpListener;
-use axum::{Router, response::IntoResponse, routing::get};
-use paper_trading_backend::{AppConfig, AppState, config::DatabaseConfig};
 use tower_http::cors::CorsLayer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Hello, world!");
-
     dotenvy::dotenv().ok();
 
     let app_config = AppConfig::from_env();
-    let db_confifg = DatabaseConfig::from_env();
+    let db_config = DatabaseConfig::from_env();
 
-    let session = db_confifg.create_session().await?;
+    let session = db_config.create_session().await?;
+    let app_state = AppState::new(session).await?;
 
-    let app_state = AppState::new(session);
-
-    let routes = Router::new().route("/health", get(health_check));
+    let routes = Router::new()
+        .route("/health", get(health_check))
+        .nest("/users", routes::user::routes())
+        .route("/trade", post(execute_trade))
+        .route("/portfolio/{wallet_address}", get(get_portfolio))
+        .route("/leaderboard", get(get_leaderboard));
 
     let app = Router::new()
         .merge(routes)
@@ -25,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(app_state);
 
     let addr = format!("{}:{}", app_config.host, app_config.port);
-    let listener = TcpListener::bind(addr).await.unwrap();
+    let listener = TcpListener::bind(addr).await?;
 
     axum::serve(listener, app).await?;
 
