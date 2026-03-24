@@ -18,9 +18,10 @@ const GET_PORTFOLIO: &str = "SELECT wallet_address ,
     balance ,
     realized_pnl FROM paper_trading.portfolio_performance WHERE wallet_address = ?";
 
+#[derive(Clone)]
 pub struct PortfolioPerformanceDB {
-    pub snapshot_statement: PreparedStatement,
-    pub get_portfolio_statement: PreparedStatement,
+    snapshot_statement: PreparedStatement,
+    get_portfolio_statement: PreparedStatement,
 }
 
 impl PortfolioPerformanceDB {

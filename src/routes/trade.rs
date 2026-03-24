@@ -85,5 +85,5 @@ pub async fn get_trades(
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/trade", post(execute_trade))
-        .route("/trades/:wallet_address", get(get_trades))
+        .route("/trades/:{wallet_address}", get(get_trades))
 }

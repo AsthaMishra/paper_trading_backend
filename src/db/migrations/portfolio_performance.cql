@@ -1,7 +1,7 @@
-
-CREATE TABLE IF NOT EXISTS paper_trading.portfolio_performance{
+CREATE TABLE IF NOT EXISTS paper_trading.portfolio_performance (
     wallet_address TEXT,
-    timestamp TIMESTAMP,
+    recorded_at TIMESTAMP,
     balance DOUBLE,
-    realized_pnl DOUBLE
-}
+    total_realized_pnl DOUBLE,
+    PRIMARY KEY (wallet_address, recorded_at)
+) WITH CLUSTERING ORDER BY (recorded_at DESC);

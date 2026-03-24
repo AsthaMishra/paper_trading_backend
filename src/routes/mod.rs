@@ -11,6 +11,9 @@ pub use leaderboard::*;
 pub mod user;
 pub use user::*;
 
+pub mod portfolio_performance;
+pub use portfolio_performance::*;
+
 use crate::AppState;
 
 pub fn routes() -> Router<AppState> {
