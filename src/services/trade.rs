@@ -201,6 +201,7 @@ impl TradeService {
         self.leaderboard_db
             .upsert(
                 &self.db,
+                user.total_realized_pnl,
                 Leaderboard {
                     bucket: "global".to_string(),
                     total_pnl: new_total_pnl,

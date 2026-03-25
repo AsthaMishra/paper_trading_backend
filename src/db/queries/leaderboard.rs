@@ -4,21 +4,26 @@ use scylla::{client::session::Session, statement::prepared::PreparedStatement};
 
 use crate::Leaderboard;
 
-const UPSERT_LEADERBOARD_QUERY: &str =
+const INSERT_LEADERBOARD_QUERY: &str =
     "INSERT INTO paper_trading.leaderboard (bucket, total_pnl, wallet_address) VALUES (?, ?, ?)";
+
+const DELETE_LEADERBOARD_QUERY: &str =
+    "DELETE FROM paper_trading.leaderboard WHERE bucket = ? AND total_pnl = ? AND wallet_address = ?";
 
 const GET_LEADERBOARD_QUERY: &str = "SELECT bucket, total_pnl, wallet_address FROM paper_trading.leaderboard WHERE bucket = ? LIMIT ?";
 
 #[derive(Clone)]
 pub struct LeaderboardDb {
-    upsert: PreparedStatement,
+    insert: PreparedStatement,
+    delete: PreparedStatement,
     get: PreparedStatement,
 }
 
 impl LeaderboardDb {
     pub async fn new(session: &Session) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
-            upsert: session.prepare(UPSERT_LEADERBOARD_QUERY).await?,
+            insert: session.prepare(INSERT_LEADERBOARD_QUERY).await?,
+            delete: session.prepare(DELETE_LEADERBOARD_QUERY).await?,
             get: session.prepare(GET_LEADERBOARD_QUERY).await?,
         })
     }
@@ -26,11 +31,18 @@ impl LeaderboardDb {
     pub async fn upsert(
         &self,
         session: &Session,
+        old_pnl: f64,
         entry: Leaderboard,
     ) -> Result<(), Box<dyn Error>> {
         session
             .execute_unpaged(
-                &self.upsert,
+                &self.delete,
+                (&entry.bucket, old_pnl, &entry.wallet_address),
+            )
+            .await?;
+        session
+            .execute_unpaged(
+                &self.insert,
                 (&entry.bucket, entry.total_pnl, &entry.wallet_address),
             )
             .await?;
