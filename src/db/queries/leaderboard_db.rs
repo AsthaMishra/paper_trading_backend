@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use scylla::{client::session::Session, statement::prepared::PreparedStatement};
+use scylla::{client::session::Session, statement::{batch::{Batch, BatchType}, prepared::PreparedStatement}};
 
 use crate::Leaderboard;
 
@@ -14,16 +14,21 @@ const GET_LEADERBOARD_QUERY: &str = "SELECT bucket, total_pnl, wallet_address FR
 
 #[derive(Clone)]
 pub struct LeaderboardDb {
-    insert: PreparedStatement,
-    delete: PreparedStatement,
+    upsert_batch: Batch,
     get: PreparedStatement,
 }
 
 impl LeaderboardDb {
     pub async fn new(session: &Session) -> Result<Self, Box<dyn Error>> {
+        let delete = session.prepare(DELETE_LEADERBOARD_QUERY).await?;
+        let insert = session.prepare(INSERT_LEADERBOARD_QUERY).await?;
+
+        let mut upsert_batch = Batch::new(BatchType::Unlogged);
+        upsert_batch.append_statement(delete);
+        upsert_batch.append_statement(insert);
+
         Ok(Self {
-            insert: session.prepare(INSERT_LEADERBOARD_QUERY).await?,
-            delete: session.prepare(DELETE_LEADERBOARD_QUERY).await?,
+            upsert_batch,
             get: session.prepare(GET_LEADERBOARD_QUERY).await?,
         })
     }
@@ -34,18 +39,10 @@ impl LeaderboardDb {
         old_pnl: f64,
         entry: Leaderboard,
     ) -> Result<(), Box<dyn Error>> {
-        session
-            .execute_unpaged(
-                &self.delete,
-                (&entry.bucket, old_pnl, &entry.wallet_address),
-            )
-            .await?;
-        session
-            .execute_unpaged(
-                &self.insert,
-                (&entry.bucket, entry.total_pnl, &entry.wallet_address),
-            )
-            .await?;
+        session.batch(&self.upsert_batch, (
+            (&entry.bucket, old_pnl, &entry.wallet_address),
+            (&entry.bucket, entry.total_pnl, &entry.wallet_address),
+        )).await?;
         Ok(())
     }
 

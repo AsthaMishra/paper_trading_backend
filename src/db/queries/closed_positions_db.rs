@@ -8,7 +8,7 @@ use scylla::{
 
 use crate::ClosedPosition;
 
-const INSERT_CLOSED_POSITION: &str = "INSERT INTO paper_trading.closed_positions (
+pub(crate) const INSERT_CLOSED_POSITION: &str = "INSERT INTO paper_trading.closed_positions (
     wallet_address,
     closed_at,
     asset,
@@ -24,7 +24,7 @@ const GET_CLOSED_POSITIONS: &str = "SELECT wallet_address, closed_at, asset, ope
 
 #[derive(Clone)]
 pub struct ClosedPositionsDb {
-    insert: PreparedStatement,
+    pub(crate) insert: PreparedStatement,
     get: PreparedStatement,
 }
 

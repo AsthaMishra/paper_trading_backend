@@ -2,9 +2,8 @@ use std::{error::Error, sync::Arc};
 
 use base64::{Engine, prelude::BASE64_STANDARD};
 use scylla::{client::session::Session, response::PagingState};
-use uuid::Uuid;
 
-use crate::{ClosedPosition, ClosedPositionsDb, Leaderboard, LeaderboardDb, PortfolioPerformanceDB, PositionsDb, TradeDB, UserDb};
+use crate::{FullSellExtra, Leaderboard, LeaderboardDb, PositionsDb, TradeDB, TradeData, UserDb};
 
 const FEE_RATE: f64 = 0.001; // 0.1%
 
@@ -15,8 +14,6 @@ pub struct TradeService {
     positions_db: PositionsDb,
     trade_db: TradeDB,
     leaderboard_db: LeaderboardDb,
-    closed_positions_db: ClosedPositionsDb,
-    portfolio_performance_db: PortfolioPerformanceDB,
 }
 
 impl TradeService {
@@ -26,8 +23,6 @@ impl TradeService {
             positions_db: PositionsDb::new(&db).await?,
             trade_db: TradeDB::new(&db).await?,
             leaderboard_db: LeaderboardDb::new(&db).await?,
-            closed_positions_db: ClosedPositionsDb::new(&db).await?,
-            portfolio_performance_db: PortfolioPerformanceDB::new(&db).await?,
             db,
         })
     }
@@ -59,49 +54,33 @@ impl TradeService {
             .get_position(&self.db, &wallet_address, &asset)
             .await?;
 
+        let data = TradeData {
+            wallet_address: &wallet_address,
+            asset: &asset,
+            quantity,
+            filled_price,
+            order_price,
+            total_value,
+            fees,
+            new_balance: user.current_balance - cost,
+            total_realized_pnl: user.total_realized_pnl,
+            total_trades: user.total_trades + 1,
+            winning_trades: user.winning_trades,
+            best_trade: user.best_trade,
+            worst_trade: user.worst_trade,
+        };
+
         match existing {
-            None => {
-                self.positions_db
-                    .create_position(&self.db, &wallet_address, &asset, quantity, filled_price)
-                    .await?;
-            }
+            None => self.trade_db.buy_new_position(&self.db, &data).await?,
             Some(pos) => {
                 let new_qty = pos.quantity + quantity;
                 let new_avg =
                     (pos.quantity * pos.avg_entry_price + quantity * filled_price) / new_qty;
-                self.positions_db
-                    .update_position(&self.db, &wallet_address, &asset, new_qty, new_avg)
+                self.trade_db
+                    .buy_existing_position(&self.db, &data, new_qty, new_avg)
                     .await?;
             }
         }
-
-        self.trade_db
-            .record(
-                &self.db,
-                wallet_address.clone(),
-                Uuid::new_v4(),
-                asset,
-                "buy".to_string(),
-                quantity,
-                order_price,
-                filled_price,
-                total_value,
-                fees,
-            )
-            .await?;
-
-        self.user_db
-            .update_all(
-                &self.db,
-                &wallet_address,
-                user.current_balance - cost,
-                user.total_realized_pnl,
-                user.total_trades + 1,
-                user.winning_trades,
-                user.best_trade,
-                user.worst_trade,
-            )
-            .await?;
 
         Ok(())
     }
@@ -134,71 +113,57 @@ impl TradeService {
         }
 
         let pnl_this_trade = (filled_price - pos.avg_entry_price) * quantity;
-        let new_realized_pnl = pos.realized_pnl + pnl_this_trade;
-
-        if (pos.quantity - quantity).abs() < f64::EPSILON {
-            self.closed_positions_db
-                .insert(
-                    &self.db,
-                    &ClosedPosition {
-                        wallet_address: wallet_address.clone(),
-                        closed_at: chrono::Utc::now().timestamp_millis(),
-                        asset: asset.clone(),
-                        opened_at: pos.opened_at,
-                        quantity: pos.quantity,
-                        avg_entry_price: pos.avg_entry_price,
-                        exit_price: filled_price,
-                        realized_pnl: new_realized_pnl,
-                    },
-                )
-                .await?;
-            self.positions_db
-                .full_sell(&self.db, &wallet_address, &asset)
-                .await?;
-        } else {
-            let new_qty = pos.quantity - quantity;
-            self.positions_db
-                .partial_sell(&self.db, &wallet_address, &asset, new_qty, new_realized_pnl)
-                .await?;
-        }
-
-        self.trade_db
-            .record(
-                &self.db,
-                wallet_address.clone(),
-                Uuid::new_v4(),
-                asset.clone(),
-                "sell".to_string(),
-                quantity,
-                order_price,
-                filled_price,
-                total_value,
-                fees,
-            )
-            .await?;
-
-        let new_balance = user.current_balance + total_value - fees;
+        let new_position_pnl = pos.realized_pnl + pnl_this_trade;
         let new_total_pnl = user.total_realized_pnl + pnl_this_trade;
         let new_winning_trades = if pnl_this_trade > 0.0 {
             user.winning_trades + 1
         } else {
             user.winning_trades
         };
-        let new_best_trade = f64::max(user.best_trade, pnl_this_trade);
-        let new_worst_trade = f64::min(user.worst_trade, pnl_this_trade);
+        let is_first_sell =
+            user.total_realized_pnl == 0.0 && user.best_trade == 0.0 && user.worst_trade == 0.0;
+        let new_best_trade = if is_first_sell {
+            pnl_this_trade
+        } else {
+            f64::max(user.best_trade, pnl_this_trade)
+        };
+        let new_worst_trade = if is_first_sell {
+            pnl_this_trade
+        } else {
+            f64::min(user.worst_trade, pnl_this_trade)
+        };
 
-        self.user_db
-            .update_all(
-                &self.db,
-                &wallet_address,
-                new_balance,
-                new_total_pnl,
-                user.total_trades + 1,
-                new_winning_trades,
-                new_best_trade,
-                new_worst_trade,
-            )
-            .await?;
+        let data = TradeData {
+            wallet_address: &wallet_address,
+            asset: &asset,
+            quantity,
+            filled_price,
+            order_price,
+            total_value,
+            fees,
+            new_balance: user.current_balance + total_value - fees,
+            total_realized_pnl: new_total_pnl,
+            total_trades: user.total_trades + 1,
+            winning_trades: new_winning_trades,
+            best_trade: new_best_trade,
+            worst_trade: new_worst_trade,
+        };
+
+        if (pos.quantity - quantity).abs() < f64::EPSILON {
+            let extra = FullSellExtra {
+                opened_at: pos.opened_at,
+                position_qty: pos.quantity,
+                avg_entry_price: pos.avg_entry_price,
+            };
+            self.trade_db
+                .sell_full(&self.db, &data, new_position_pnl, &extra)
+                .await?;
+        } else {
+            let new_qty = pos.quantity - quantity;
+            self.trade_db
+                .sell_partial(&self.db, &data, new_qty, new_position_pnl)
+                .await?;
+        }
 
         self.leaderboard_db
             .upsert(
@@ -210,10 +175,6 @@ impl TradeService {
                     wallet_address: wallet_address.clone(),
                 },
             )
-            .await?;
-
-        self.portfolio_performance_db
-            .snapshot(&self.db, wallet_address, new_balance, new_total_pnl)
             .await?;
 
         Ok(())

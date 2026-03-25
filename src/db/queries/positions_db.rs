@@ -1,7 +1,7 @@
 use scylla::{client::session::Session, statement::prepared::PreparedStatement};
 use std::error::Error;
 
-const CREATE_POSITION: &str = "INSERT INTO paper_trading.positions(
+pub(crate) const CREATE_POSITION: &str = "INSERT INTO paper_trading.positions(
     wallet_address,
     asset,
     quantity,
@@ -12,7 +12,7 @@ const CREATE_POSITION: &str = "INSERT INTO paper_trading.positions(
 ) VALUES (?,?,?,?,?,?,?)
 ";
 
-const UPDATE_POSITION: &str = "UPDATE paper_trading.positions
+pub(crate) const UPDATE_POSITION: &str = "UPDATE paper_trading.positions
 SET
     quantity = ?,
     avg_entry_price = ?,
@@ -20,7 +20,7 @@ SET
     WHERE wallet_address = ? AND asset = ?
 ";
 
-const PARTIAL_SELL: &str = "UPDATE paper_trading.positions
+pub(crate) const PARTIAL_SELL: &str = "UPDATE paper_trading.positions
 SET
     quantity = ?,
     realized_pnl = ?,
@@ -28,7 +28,7 @@ SET
     WHERE wallet_address = ? AND asset = ?
 ";
 
-const FULL_SELL: &str = "DELETE from paper_trading.positions
+pub(crate) const FULL_SELL: &str = "DELETE from paper_trading.positions
 WHERE wallet_address = ? AND asset = ?";
 
 const GET_POSITION: &str = "SELECT wallet_address, asset, quantity, avg_entry_price, realized_pnl, opened_at, updated_at FROM paper_trading.positions WHERE wallet_address = ? AND asset = ?";
@@ -37,10 +37,10 @@ const GET_ALL_POSITIONS: &str = "SELECT wallet_address, asset, quantity, avg_ent
 
 #[derive(Clone)]
 pub struct PositionsDb {
-    create_position: PreparedStatement,
-    update_position: PreparedStatement,
-    partial_sell: PreparedStatement,
-    full_sell: PreparedStatement,
+    pub(crate) create_position: PreparedStatement,
+    pub(crate) update_position: PreparedStatement,
+    pub(crate) partial_sell: PreparedStatement,
+    pub(crate) full_sell: PreparedStatement,
     get_position: PreparedStatement,
     get_all_positions: PreparedStatement,
 }

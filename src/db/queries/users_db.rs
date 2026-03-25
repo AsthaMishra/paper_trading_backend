@@ -24,7 +24,7 @@ const UPDATE_USER_CURRENT_BALANCE_QUERY: &str =
 const UPDATE_USER_PNL_QUERY: &str =
     "UPDATE paper_trading.users SET total_realized_pnl = ? WHERE wallet_address = ?";
 
-const UPDATE_USER_QUERY: &str = "UPDATE paper_trading.users SET current_balance = ?, total_realized_pnl = ?, total_trades = ?, winning_trades = ?, best_trade = ?, worst_trade = ? WHERE wallet_address = ?";
+pub(crate) const UPDATE_USER_QUERY: &str = "UPDATE paper_trading.users SET current_balance = ?, total_realized_pnl = ?, total_trades = ?, winning_trades = ?, best_trade = ?, worst_trade = ? WHERE wallet_address = ?";
 
 #[derive(Clone)]
 pub struct UserDb {
@@ -32,7 +32,7 @@ pub struct UserDb {
     get_user: PreparedStatement,
     update_balance: PreparedStatement,
     update_pnl: PreparedStatement,
-    update_user: PreparedStatement,
+    pub(crate) update_user: PreparedStatement,
 }
 
 impl UserDb {

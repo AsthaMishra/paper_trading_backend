@@ -8,7 +8,7 @@ use scylla::{
 
 use crate::PortfolioPerformance;
 
-const SNAPSHOT: &str = "INSERT INTO paper_trading.portfolio_performance ( wallet_address ,
+pub(crate) const SNAPSHOT: &str = "INSERT INTO paper_trading.portfolio_performance ( wallet_address ,
     timestamp ,
     balance ,
     realized_pnl ) VALUES (?, ?, ?,?)";
@@ -20,7 +20,7 @@ const GET_PORTFOLIO: &str = "SELECT wallet_address ,
 
 #[derive(Clone)]
 pub struct PortfolioPerformanceDB {
-    snapshot_statement: PreparedStatement,
+    pub(crate) snapshot_statement: PreparedStatement,
     get_portfolio_statement: PreparedStatement,
 }
 
@@ -93,3 +93,4 @@ impl PortfolioPerformanceDB {
         Ok((portfolio, next_paging_state))
     }
 }
+       

@@ -3,5 +3,5 @@ CREATE TABLE IF NOT EXISTS paper_trading.portfolio_performance (
     timestamp TIMESTAMP,
     balance DOUBLE,
     realized_pnl DOUBLE,
-    PRIMARY KEY (wallet_address, recorded_at)
-) WITH CLUSTERING ORDER BY (recorded_at DESC);
+    PRIMARY KEY (wallet_address, timestamp)
+) WITH CLUSTERING ORDER BY (timestamp DESC);
