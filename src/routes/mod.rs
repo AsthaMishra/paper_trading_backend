@@ -1,4 +1,6 @@
-use axum::{Router};
+use axum::Router;
+
+pub const DEFAULT_PAGE_SIZE: i32 = 20;
 
 pub mod trade;
 pub use trade::*;

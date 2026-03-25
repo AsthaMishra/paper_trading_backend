@@ -1,4 +1,5 @@
 use crate::{AppState, PortfolioPerformance};
+use super::DEFAULT_PAGE_SIZE;
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
@@ -19,13 +20,12 @@ pub struct PortfolioPerformanceResponse {
     pub next_page_token: Option<String>,
 }
 
-const PAGE_SIZE: i32 = 20;
 pub async fn get_performance_history(
     State(state): State<AppState>,
     Path(wallet_address): Path<String>,
     Query(params): Query<PortfolioPerformanceRequest>,
 ) -> Result<Json<PortfolioPerformanceResponse>, (StatusCode, String)> {
-    let page_size = params.page_size.unwrap_or(PAGE_SIZE);
+    let page_size = params.page_size.unwrap_or(DEFAULT_PAGE_SIZE);
     let (history, next_page_token) = state
         .portfolio_performance_service
         .get_performance_portfolio(wallet_address, page_size, params.page_token)

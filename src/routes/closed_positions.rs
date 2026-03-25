@@ -9,6 +9,7 @@ use scylla::response::PagingState;
 use serde::{Deserialize, Serialize};
 
 use crate::{AppState, ClosedPosition};
+use super::DEFAULT_PAGE_SIZE;
 
 #[derive(Deserialize)]
 pub struct ClosedPositionsQuery {
@@ -22,14 +23,12 @@ pub struct ClosedPositionsResponse {
     pub next_page_token: Option<String>,
 }
 
-const PAGE_SIZE: i32 = 20;
-
 pub async fn get_closed_positions(
     State(state): State<AppState>,
     Path(wallet_address): Path<String>,
     Query(params): Query<ClosedPositionsQuery>,
 ) -> Result<Json<ClosedPositionsResponse>, (StatusCode, String)> {
-    let page_size = params.page_size.unwrap_or(PAGE_SIZE);
+    let page_size = params.page_size.unwrap_or(DEFAULT_PAGE_SIZE);
     let paging_state = match params.page_token {
         Some(token) => {
             let bytes = BASE64_STANDARD

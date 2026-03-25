@@ -7,6 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::{AppState, Trades};
+use super::DEFAULT_PAGE_SIZE;
 
 #[derive(Deserialize)]
 pub struct TradeRequest {
@@ -38,6 +39,16 @@ pub async fn execute_trade(
     State(state): State<AppState>,
     Json(req): Json<TradeRequest>,
 ) -> Result<Json<TradeResponse>, (StatusCode, String)> {
+    if req.quantity <= 0.0 {
+        return Err((StatusCode::BAD_REQUEST, "quantity must be greater than 0".to_string()));
+    }
+    if req.order_price <= 0.0 {
+        return Err((StatusCode::BAD_REQUEST, "order_price must be greater than 0".to_string()));
+    }
+    if req.asset.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "asset cannot be empty".to_string()));
+    }
+
     let result = match req.side.as_str() {
         "buy" => {
             state
@@ -71,7 +82,7 @@ pub async fn get_trades(
     Path(wallet_address): Path<String>,
     Query(params): Query<TradeHistoryQuery>,
 ) -> Result<Json<TradeHistoryResponse>, (StatusCode, String)> {
-    let page_size = params.page_size.unwrap_or(20);
+    let page_size = params.page_size.unwrap_or(DEFAULT_PAGE_SIZE);
 
     let (trades, next_page_token) = state
         .trade_service
