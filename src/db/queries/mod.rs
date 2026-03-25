@@ -12,3 +12,6 @@ pub use leaderboard::*;
 
 pub mod portfolio_performance;
 pub use portfolio_performance::*;
+
+pub mod closed_positions;
+pub use closed_positions::*;

@@ -4,7 +4,7 @@ use base64::{Engine, prelude::BASE64_STANDARD};
 use scylla::{client::session::Session, response::PagingState};
 use uuid::Uuid;
 
-use crate::{Leaderboard, LeaderboardDb, PositionsDb, TradeDB, UserDb};
+use crate::{ClosedPosition, ClosedPositionsDb, Leaderboard, LeaderboardDb, PositionsDb, TradeDB, UserDb};
 
 const FEE_RATE: f64 = 0.001; // 0.1%
 
@@ -15,6 +15,7 @@ pub struct TradeService {
     positions_db: PositionsDb,
     trade_db: TradeDB,
     leaderboard_db: LeaderboardDb,
+    closed_positions_db: ClosedPositionsDb,
 }
 
 impl TradeService {
@@ -24,6 +25,7 @@ impl TradeService {
             positions_db: PositionsDb::new(&db).await?,
             trade_db: TradeDB::new(&db).await?,
             leaderboard_db: LeaderboardDb::new(&db).await?,
+            closed_positions_db: ClosedPositionsDb::new(&db).await?,
             db,
         })
     }
@@ -133,6 +135,21 @@ impl TradeService {
         let new_realized_pnl = pos.realized_pnl + pnl_this_trade;
 
         if (pos.quantity - quantity).abs() < f64::EPSILON {
+            self.closed_positions_db
+                .insert(
+                    &self.db,
+                    &ClosedPosition {
+                        wallet_address: wallet_address.clone(),
+                        closed_at: chrono::Utc::now().timestamp_millis(),
+                        asset: asset.clone(),
+                        opened_at: pos.opened_at,
+                        quantity: pos.quantity,
+                        avg_entry_price: pos.avg_entry_price,
+                        exit_price: filled_price,
+                        realized_pnl: new_realized_pnl,
+                    },
+                )
+                .await?;
             self.positions_db
                 .full_sell(&self.db, &wallet_address, &asset)
                 .await?;
