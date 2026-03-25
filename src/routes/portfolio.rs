@@ -20,5 +20,5 @@ pub async fn get_portfolio(
 }
 
 pub fn routes() -> Router<AppState> {
-    Router::new().route("portfolio", get(get_portfolio))
+    Router::new().route("/{wallet_address}", get(get_portfolio))
 }

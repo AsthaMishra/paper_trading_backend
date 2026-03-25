@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
-use axum::{Router, response::IntoResponse, routing::{get, post}};
-use paper_trading_backend::{
-    AppConfig, AppState,
-    config::DatabaseConfig,
-    routes::{self, create_user, execute_trade, get_leaderboard, get_portfolio},
-};
+use axum::{Router, response::IntoResponse, routing::get};
+use paper_trading_backend::{AppConfig, AppState, config::DatabaseConfig, routes};
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
@@ -22,9 +18,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let routes = Router::new()
         .route("/health", get(health_check))
         .nest("/users", routes::user::routes())
-        .route("/trade", post(execute_trade))
-        .route("/portfolio/{wallet_address}", get(get_portfolio))
-        .route("/leaderboard", get(get_leaderboard));
+        .nest("/trade", routes::trade::routes())
+        .nest("/portfolio", routes::portfolio::routes())
+        .nest("/leaderboard", routes::leaderboard::routes())
+        .nest("/portfolio-performance", routes::portfolio_performance::routes());
 
     let app = Router::new()
         .merge(routes)

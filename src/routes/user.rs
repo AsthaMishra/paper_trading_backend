@@ -53,6 +53,6 @@ pub async fn get_user(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/users", post(create_user))
-        .route("/users/:{wallet_address}", get(get_user))
+        .route("/", post(create_user))
+        .route("/{wallet_address}", get(get_user))
 }

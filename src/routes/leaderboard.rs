@@ -30,5 +30,5 @@ pub async fn get_leaderboard(
 }
 
 pub fn routes() -> Router<AppState> {
-    Router::new().route("leaderboard", get(get_leaderboard))
+    Router::new().route("/", get(get_leaderboard))
 }
