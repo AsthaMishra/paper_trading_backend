@@ -7,3 +7,4 @@ pub struct PortfolioPerformance {
     pub balance: f64,
     pub realized_pnl: f64,
 }
+
