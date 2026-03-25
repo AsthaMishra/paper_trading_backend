@@ -7,5 +7,9 @@ CREATE TABLE IF NOT EXISTS paper_trading.users (
                 starting_balance DOUBLE,
                 current_balance DOUBLE,
                 total_realized_pnl DOUBLE,
-                created_at TIMESTAMP
+                created_at TIMESTAMP,
+                total_trades INT,
+                winning_trades INT,
+                best_trade DOUBLE,
+                worst_trade DOUBLE
             );

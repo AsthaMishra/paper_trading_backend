@@ -87,7 +87,16 @@ impl TradeService {
             .await?;
 
         self.user_db
-            .update_balance(&self.db, &wallet_address, user.current_balance - cost)
+            .update_all(
+                &self.db,
+                &wallet_address,
+                user.current_balance - cost,
+                user.total_realized_pnl,
+                user.total_trades + 1,
+                user.winning_trades,
+                user.best_trade,
+                user.worst_trade,
+            )
             .await?;
 
         Ok(())
@@ -151,13 +160,25 @@ impl TradeService {
 
         let new_balance = user.current_balance + total_value - fees;
         let new_total_pnl = user.total_realized_pnl + pnl_this_trade;
+        let new_winning_trades = if pnl_this_trade > 0.0 {
+            user.winning_trades + 1
+        } else {
+            user.winning_trades
+        };
+        let new_best_trade = f64::max(user.best_trade, pnl_this_trade);
+        let new_worst_trade = f64::min(user.worst_trade, pnl_this_trade);
 
         self.user_db
-            .update_balance(&self.db, &wallet_address, new_balance)
-            .await?;
-
-        self.user_db
-            .update_pnl(&self.db, &wallet_address, new_total_pnl)
+            .update_all(
+                &self.db,
+                &wallet_address,
+                new_balance,
+                new_total_pnl,
+                user.total_trades + 1,
+                new_winning_trades,
+                new_best_trade,
+                new_worst_trade,
+            )
             .await?;
 
         self.leaderboard_db

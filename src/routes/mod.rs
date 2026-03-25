@@ -1,5 +1,5 @@
 pub mod trade;
-use axum::{Router, routing::Route};
+use axum::{Router};
 pub use trade::*;
 
 pub mod portfolio;
@@ -22,4 +22,5 @@ pub fn routes() -> Router<AppState> {
         .merge(trade::routes())
         .merge(portfolio::routes())
         .merge(leaderboard::routes())
+        .merge(portfolio_performance::routes())
 }

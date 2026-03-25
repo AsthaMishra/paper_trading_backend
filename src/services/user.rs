@@ -27,6 +27,10 @@ impl UserService {
             current_balance: STARTING_BALANCE,
             total_realized_pnl: 0.0,
             created_at: chrono::Utc::now().timestamp_millis(),
+            winning_trades: 0,
+            total_trades: 0,
+            best_trade: 0.0,
+            worst_trade: 0.0,
         };
         self.user_db.create_user(&self.db, user).await
     }
