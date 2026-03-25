@@ -4,7 +4,7 @@ use base64::{Engine, prelude::BASE64_STANDARD};
 use scylla::{client::session::Session, response::PagingState};
 use uuid::Uuid;
 
-use crate::{ClosedPosition, ClosedPositionsDb, Leaderboard, LeaderboardDb, PositionsDb, TradeDB, UserDb};
+use crate::{ClosedPosition, ClosedPositionsDb, Leaderboard, LeaderboardDb, PortfolioPerformanceDB, PositionsDb, TradeDB, UserDb};
 
 const FEE_RATE: f64 = 0.001; // 0.1%
 
@@ -16,6 +16,7 @@ pub struct TradeService {
     trade_db: TradeDB,
     leaderboard_db: LeaderboardDb,
     closed_positions_db: ClosedPositionsDb,
+    portfolio_performance_db: PortfolioPerformanceDB,
 }
 
 impl TradeService {
@@ -26,6 +27,7 @@ impl TradeService {
             trade_db: TradeDB::new(&db).await?,
             leaderboard_db: LeaderboardDb::new(&db).await?,
             closed_positions_db: ClosedPositionsDb::new(&db).await?,
+            portfolio_performance_db: PortfolioPerformanceDB::new(&db).await?,
             db,
         })
     }
@@ -208,6 +210,10 @@ impl TradeService {
                     wallet_address: wallet_address.clone(),
                 },
             )
+            .await?;
+
+        self.portfolio_performance_db
+            .snapshot(&self.db, wallet_address, new_balance, new_total_pnl)
             .await?;
 
         Ok(())

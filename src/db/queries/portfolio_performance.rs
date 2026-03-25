@@ -65,7 +65,7 @@ impl PortfolioPerformanceDB {
 
         let (response, paging_state_response) = session
             .execute_single_page(
-                &self.get_portfolio_statement,
+                &statement,
                 (wallet_address,),
                 paging_state,
             )
