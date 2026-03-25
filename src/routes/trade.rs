@@ -16,6 +16,8 @@ pub struct TradeRequest {
     pub side: String,
     pub quantity: f64,
     pub order_price: f64,
+    pub stop_loss: Option<f64>,
+    pub take_profit: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -59,13 +61,25 @@ pub async fn execute_trade(
         "buy" => {
             state
                 .trade_service
-                .buy(req.wallet_address, req.asset, req.quantity, req.order_price)
+                .buy(
+                    req.wallet_address,
+                    req.asset,
+                    req.quantity,
+                    req.order_price,
+                    req.stop_loss,
+                    req.take_profit,
+                )
                 .await
         }
         "sell" => {
             state
                 .trade_service
-                .sell(req.wallet_address, req.asset, req.quantity, req.order_price)
+                .sell(
+                    req.wallet_address,
+                    req.asset,
+                    req.quantity,
+                    req.order_price,
+                )
                 .await
         }
         _ => {

@@ -8,15 +8,25 @@ pub(crate) const CREATE_POSITION: &str = "INSERT INTO paper_trading.positions(
     avg_entry_price,
     realized_pnl,
     opened_at,
-    updated_at
-) VALUES (?,?,?,?,?,?,?)
+    updated_at,
+    stop_loss,
+    take_profit
+) VALUES (?,?,?,?,?,?,?,?,?)
 ";
 
 pub(crate) const UPDATE_POSITION: &str = "UPDATE paper_trading.positions
 SET
     quantity = ?,
     avg_entry_price = ?,
-    updated_at = ?
+    updated_at = ?,  
+    stop_loss = ?, 
+    take_profit = ? 
+    WHERE wallet_address = ? AND asset = ?
+";
+
+pub(crate) const SET_AUTO_SELL_CONDN: &str = "UPDATE paper_trading.positions 
+SET 
+    stop_loss = ?, take_profit = ? 
     WHERE wallet_address = ? AND asset = ?
 ";
 
@@ -31,9 +41,9 @@ SET
 pub(crate) const FULL_SELL: &str = "DELETE from paper_trading.positions
 WHERE wallet_address = ? AND asset = ?";
 
-const GET_POSITION: &str = "SELECT wallet_address, asset, quantity, avg_entry_price, realized_pnl, opened_at, updated_at FROM paper_trading.positions WHERE wallet_address = ? AND asset = ?";
+const GET_POSITION: &str = "SELECT wallet_address, asset, quantity, avg_entry_price, realized_pnl, opened_at, updated_at, stop_loss, take_profit FROM paper_trading.positions WHERE wallet_address = ? AND asset = ?";
 
-const GET_ALL_POSITIONS: &str = "SELECT wallet_address, asset, quantity, avg_entry_price, realized_pnl, opened_at, updated_at FROM paper_trading.positions WHERE wallet_address = ?";
+const GET_ALL_POSITIONS: &str = "SELECT wallet_address, asset, quantity, avg_entry_price, realized_pnl, opened_at, updated_at, stop_loss, take_profit FROM paper_trading.positions WHERE wallet_address = ?";
 
 #[derive(Clone)]
 pub struct PositionsDb {
@@ -43,6 +53,7 @@ pub struct PositionsDb {
     pub(crate) full_sell: PreparedStatement,
     get_position: PreparedStatement,
     get_all_positions: PreparedStatement,
+    set_auto_sell: PreparedStatement,
 }
 
 impl PositionsDb {
@@ -54,6 +65,7 @@ impl PositionsDb {
             full_sell: session.prepare(FULL_SELL).await?,
             get_position: session.prepare(GET_POSITION).await?,
             get_all_positions: session.prepare(GET_ALL_POSITIONS).await?,
+            set_auto_sell: session.prepare(SET_AUTO_SELL_CONDN).await?,
         })
     }
 
@@ -64,6 +76,8 @@ impl PositionsDb {
         asset: &str,
         quantity: f64,
         avg_entry_price: f64,
+        stop_loss: Option<f64>,
+        take_profit: Option<f64>,
     ) -> Result<(), Box<dyn Error>> {
         session
             .execute_unpaged(
@@ -76,6 +90,8 @@ impl PositionsDb {
                     0.0,
                     chrono::Utc::now().timestamp_millis(),
                     chrono::Utc::now().timestamp_millis(),
+                    stop_loss,
+                    take_profit,
                 ),
             )
             .await?;
@@ -89,6 +105,8 @@ impl PositionsDb {
         asset: &str,
         quantity: f64,
         avg_entry_price: f64,
+        stop_loss: Option<f64>,
+        take_profit: Option<f64>,
     ) -> Result<(), Box<dyn Error>> {
         session
             .execute_unpaged(
@@ -97,6 +115,8 @@ impl PositionsDb {
                     quantity,
                     avg_entry_price,
                     chrono::Utc::now().timestamp_millis(),
+                    stop_loss,
+                    take_profit,
                     wallet_address,
                     asset,
                 ),
@@ -140,7 +160,17 @@ impl PositionsDb {
             .into_rows_result()?;
 
         let position = result
-            .rows::<(String, String, f64, f64, f64, i64, i64)>()?
+            .rows::<(
+                String,
+                String,
+                f64,
+                f64,
+                f64,
+                i64,
+                i64,
+                Option<f64>,
+                Option<f64>,
+            )>()?
             .filter_map(|r| r.ok())
             .map(
                 |(
@@ -151,6 +181,8 @@ impl PositionsDb {
                     realized_pnl,
                     opened_at,
                     updated_at,
+                    stop_loss,
+                    take_profit,
                 )| {
                     crate::Positions {
                         wallet_address,
@@ -160,6 +192,8 @@ impl PositionsDb {
                         realized_pnl,
                         opened_at,
                         updated_at,
+                        stop_loss,
+                        take_profit,
                     }
                 },
             )
@@ -179,7 +213,17 @@ impl PositionsDb {
             .into_rows_result()?;
 
         let positions = result
-            .rows::<(String, String, f64, f64, f64, i64, i64)>()?
+            .rows::<(
+                String,
+                String,
+                f64,
+                f64,
+                f64,
+                i64,
+                i64,
+                Option<f64>,
+                Option<f64>,
+            )>()?
             .filter_map(|r| r.ok())
             .map(
                 |(
@@ -190,6 +234,8 @@ impl PositionsDb {
                     realized_pnl,
                     opened_at,
                     updated_at,
+                    stop_loss,
+                    take_profit,
                 )| {
                     crate::Positions {
                         wallet_address,
@@ -199,6 +245,8 @@ impl PositionsDb {
                         realized_pnl,
                         opened_at,
                         updated_at,
+                        stop_loss,
+                        take_profit,
                     }
                 },
             )
@@ -215,6 +263,23 @@ impl PositionsDb {
     ) -> Result<(), Box<dyn Error>> {
         session
             .execute_unpaged(&self.full_sell, (wallet_address, asset))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn set_auto_sell(
+        &self,
+        session: &Session,
+        wallet_address: &str,
+        asset: &str,
+        stop_loss: Option<f64>,
+        take_profit: Option<f64>,
+    ) -> Result<(), Box<dyn Error>> {
+        session
+            .execute_unpaged(
+                &self.set_auto_sell,
+                (stop_loss, take_profit, wallet_address, asset),
+            )
             .await?;
         Ok(())
     }

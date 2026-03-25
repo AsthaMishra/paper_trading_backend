@@ -8,5 +8,7 @@ CREATE TABLE IF NOT EXISTS paper_trading.positions (
     realized_pnl DOUBLE,
     opened_at TIMESTAMP,
     updated_at TIMESTAMP,
+    stop_loss DOUBLE,
+    take_profit DOUBLE,
     PRIMARY KEY (wallet_address, asset)
 );

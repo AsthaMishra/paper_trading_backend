@@ -33,6 +33,8 @@ impl TradeService {
         asset: String,
         quantity: f64,
         order_price: f64,
+        stop_loss: Option<f64>,
+        take_profit: Option<f64>,
     ) -> Result<(), Box<dyn Error>> {
         let filled_price = order_price;
         let total_value = quantity * filled_price;
@@ -68,6 +70,8 @@ impl TradeService {
             winning_trades: user.winning_trades,
             best_trade: user.best_trade,
             worst_trade: user.worst_trade,
+            stop_loss,
+            take_profit,
         };
 
         match existing {
@@ -76,6 +80,10 @@ impl TradeService {
                 let new_qty = pos.quantity + quantity;
                 let new_avg =
                     (pos.quantity * pos.avg_entry_price + quantity * filled_price) / new_qty;
+                // Keep existing stop_loss/take_profit if new buy doesn't specify them
+                let mut data = data;
+                data.stop_loss = data.stop_loss.or(pos.stop_loss);
+                data.take_profit = data.take_profit.or(pos.take_profit);
                 self.trade_db
                     .buy_existing_position(&self.db, &data, new_qty, new_avg)
                     .await?;
@@ -147,6 +155,8 @@ impl TradeService {
             winning_trades: new_winning_trades,
             best_trade: new_best_trade,
             worst_trade: new_worst_trade,
+            stop_loss: None,
+            take_profit: None,
         };
 
         if (pos.quantity - quantity).abs() < f64::EPSILON {
