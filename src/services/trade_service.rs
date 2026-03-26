@@ -3,7 +3,7 @@ use std::{error::Error, sync::Arc};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use scylla::{client::session::Session, response::PagingState};
 
-use crate::{FullSellExtra, Leaderboard, LeaderboardDb, PositionsDb, TradeDB, TradeData, UserDb};
+use crate::{FullSellExtra, Leaderboard, LeaderboardDb, LimitOrder, LimitOrdersDb, PositionsDb, TradeDB, TradeData, UserDb};
 
 const FEE_RATE: f64 = 0.001; // 0.1%
 
@@ -14,6 +14,7 @@ pub struct TradeService {
     positions_db: PositionsDb,
     trade_db: TradeDB,
     leaderboard_db: LeaderboardDb,
+    limit_orders_db: LimitOrdersDb,
 }
 
 impl TradeService {
@@ -23,6 +24,7 @@ impl TradeService {
             positions_db: PositionsDb::new(&db).await?,
             trade_db: TradeDB::new(&db).await?,
             leaderboard_db: LeaderboardDb::new(&db).await?,
+            limit_orders_db: LimitOrdersDb::new(&db).await?,
             db,
         })
     }
@@ -70,8 +72,6 @@ impl TradeService {
             winning_trades: user.winning_trades,
             best_trade: user.best_trade,
             worst_trade: user.worst_trade,
-            stop_loss,
-            take_profit,
         };
 
         match existing {
@@ -80,14 +80,36 @@ impl TradeService {
                 let new_qty = pos.quantity + quantity;
                 let new_avg =
                     (pos.quantity * pos.avg_entry_price + quantity * filled_price) / new_qty;
-                // Keep existing stop_loss/take_profit if new buy doesn't specify them
-                let mut data = data;
-                data.stop_loss = data.stop_loss.or(pos.stop_loss);
-                data.take_profit = data.take_profit.or(pos.take_profit);
                 self.trade_db
                     .buy_existing_position(&self.db, &data, new_qty, new_avg)
                     .await?;
             }
+        }
+
+        let now = chrono::Utc::now().timestamp_millis();
+        if let Some(sl) = stop_loss {
+            self.limit_orders_db.insert(&self.db, &LimitOrder {
+                wallet_address: wallet_address.clone(),
+                id: uuid::Uuid::new_v4(),
+                asset: asset.clone(),
+                side: "sell".to_string(),
+                order_type: "stop_loss".to_string(),
+                quantity,
+                limit_price: sl,
+                created_at: now,
+            }).await?;
+        }
+        if let Some(tp) = take_profit {
+            self.limit_orders_db.insert(&self.db, &LimitOrder {
+                wallet_address: wallet_address.clone(),
+                id: uuid::Uuid::new_v4(),
+                asset: asset.clone(),
+                side: "sell".to_string(),
+                order_type: "take_profit".to_string(),
+                quantity,
+                limit_price: tp,
+                created_at: now,
+            }).await?;
         }
 
         Ok(())
@@ -155,8 +177,6 @@ impl TradeService {
             winning_trades: new_winning_trades,
             best_trade: new_best_trade,
             worst_trade: new_worst_trade,
-            stop_loss: None,
-            take_profit: None,
         };
 
         if (pos.quantity - quantity).abs() < f64::EPSILON {

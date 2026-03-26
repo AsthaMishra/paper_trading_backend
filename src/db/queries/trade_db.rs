@@ -46,8 +46,6 @@ pub struct TradeData<'a> {
     pub winning_trades: i32,
     pub best_trade: f64,
     pub worst_trade: f64,
-    pub stop_loss: Option<f64>,
-    pub take_profit: Option<f64>,
 }
 
 pub struct FullSellExtra {
@@ -124,8 +122,6 @@ impl TradeDB {
                 0.0f64,
                 now,
                 now,
-                d.stop_loss,
-                d.take_profit,
             ),
             (
                 d.wallet_address,
@@ -167,8 +163,6 @@ impl TradeDB {
                 new_qty,
                 new_avg,
                 now,
-                d.stop_loss,
-                d.take_profit,
                 d.wallet_address,
                 d.asset,
             ),

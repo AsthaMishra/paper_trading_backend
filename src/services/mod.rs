@@ -12,3 +12,6 @@ pub use leaderboard_service::*;
 
 pub mod portfolio_performance_service;
 pub use portfolio_performance_service::*;
+
+pub mod limit_order_service;
+pub use limit_order_service::*;

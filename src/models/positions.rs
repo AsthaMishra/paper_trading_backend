@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Positions {
     pub wallet_address: String,
     pub asset: String,
@@ -10,6 +10,4 @@ pub struct Positions {
     pub realized_pnl: f64,
     pub opened_at: i64,
     pub updated_at: i64,
-    pub stop_loss: Option<f64>,
-    pub take_profit: Option<f64>
 }

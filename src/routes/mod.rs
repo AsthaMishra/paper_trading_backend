@@ -20,6 +20,9 @@ pub use portfolio_performance::*;
 pub mod closed_positions;
 pub use closed_positions::*;
 
+pub mod orders;
+pub use orders::*;
+
 use crate::AppState;
 
 pub fn routes() -> Router<AppState> {

@@ -29,25 +29,6 @@ impl PortfolioService {
             .await
     }
 
-    pub async fn set_auto_sell(
-        &self,
-        wallet_address: &str,
-        asset: &str,
-        stop_loss: Option<f64>,
-        take_profit: Option<f64>,
-    ) -> Result<(), Box<dyn Error>> {
-        let pos = self
-            .positions_db
-            .get_position(&self.db, wallet_address, asset)
-            .await?;
-        if pos.is_none() {
-            return Err("Position not found".into());
-        }
-        self.positions_db
-            .set_auto_sell(&self.db, wallet_address, asset, stop_loss, take_profit)
-            .await
-    }
-
     pub async fn get_closed_positions(
         &self,
         wallet_address: &str,
