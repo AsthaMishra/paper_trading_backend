@@ -36,7 +36,7 @@ impl LimitOrderService {
             order_type,
             quantity,
             limit_price,
-            created_at: chrono::Utc::now().timestamp_millis(),
+            created_at: chrono::Utc::now().timestamp_millis()
         };
         self.limit_orders_db.insert(&self.db, &order).await?;
         Ok(order)

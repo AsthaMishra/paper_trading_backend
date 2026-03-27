@@ -3,6 +3,28 @@ use std::sync::Arc;
 use scylla::client::{session::Session, session_builder::SessionBuilder};
 use serde::{Deserialize, Serialize};
 
+const MIGRATIONS: &[(&str, &str)] = &[
+    ("users", include_str!("../db/migrations/users.cql")),
+    ("trades", include_str!("../db/migrations/trades.cql")),
+    ("positions", include_str!("../db/migrations/positions.cql")),
+    (
+        "leaderboard",
+        include_str!("../db/migrations/leaderboard.cql"),
+    ),
+    (
+        "portfolio_performance",
+        include_str!("../db/migrations/portfolio_performance.cql"),
+    ),
+    (
+        "closed_positions",
+        include_str!("../db/migrations/closed_positions.cql"),
+    ),
+    (
+        "limit_orders",
+        include_str!("../db/migrations/limit_orders.cql"),
+    ),
+];
+
 #[derive(Serialize, Deserialize)]
 pub struct DatabaseConfig {
     pub hosts: Vec<String>,
@@ -47,6 +69,7 @@ impl DatabaseConfig {
         self.create_keyspace(&session).await?;
 
         session.use_keyspace(&self.keyspace, false).await?;
+        self.run_migrations(&session).await?;
         Ok(Arc::new(session))
     }
 
@@ -64,5 +87,21 @@ impl DatabaseConfig {
         println!("✅ Keyspace '{}' ready", self.keyspace);
         Ok(())
     }
+
+    async fn run_migrations(&self, session: &Session) -> Result<(), Box<dyn std::error::Error>> {
+        for (name, content) in MIGRATIONS {
+            for statement in content.split(';') {
+                let statement = statement.trim();
+                if statement.is_empty() || statement.to_uppercase().starts_with("USE") {
+                    continue;
+                }
+                session
+                    .query_unpaged(statement, &[])
+                    .await
+                    .map_err(|e| format!("migration '{}' failed: {}", name, e))?;
+            }
+            println!("✅ Migration '{}' applied", name);
+        }
+        Ok(())
+    }
 }
-  

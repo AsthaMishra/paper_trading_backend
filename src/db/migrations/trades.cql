@@ -1,9 +1,8 @@
 USE paper_trading;
 
-
 CREATE TABLE IF NOT EXISTS paper_trading.trades (
     wallet_address TEXT,
-    created_at TIMESTAMP,
+    created_at BIGINT,
     id UUID,
     asset TEXT,
     side TEXT,

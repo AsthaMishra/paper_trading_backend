@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS paper_trading.positions (
     quantity DOUBLE,
     avg_entry_price DOUBLE,
     realized_pnl DOUBLE,
-    opened_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    opened_at BIGINT,
+    updated_at BIGINT,
     PRIMARY KEY (wallet_address, asset)
 );

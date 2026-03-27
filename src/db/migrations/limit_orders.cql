@@ -8,6 +8,6 @@ CREATE TABLE IF NOT EXISTS paper_trading.limit_orders (
     order_type TEXT,
     quantity DOUBLE,
     limit_price DOUBLE,
-    created_at TIMESTAMP,
+    created_at BIGINT,
     PRIMARY KEY (wallet_address, id)
 );
