@@ -15,3 +15,6 @@ pub use portfolio_performance_service::*;
 
 pub mod limit_order_service;
 pub use limit_order_service::*;
+
+pub mod market_data_service;
+pub use market_data_service::*;

@@ -56,4 +56,20 @@ impl LimitOrderService {
     ) -> Result<Vec<LimitOrder>, Box<dyn Error>> {
         self.limit_orders_db.get_by_wallet(&self.db, wallet_address).await
     }
+
+    pub async fn get_all(&self) -> Result<Vec<LimitOrder>, Box<dyn Error>> {
+        self.limit_orders_db.get_all(&self.db).await
+    }
+
+    pub async fn cancel_by_wallet_and_asset(
+        &self,
+        wallet_address: &str,
+        asset: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let orders = self.limit_orders_db.get_by_wallet(&self.db, wallet_address).await?;
+        for order in orders.into_iter().filter(|o| o.asset == asset) {
+            self.limit_orders_db.delete(&self.db, wallet_address, order.id).await?;
+        }
+        Ok(())
+    }
 }

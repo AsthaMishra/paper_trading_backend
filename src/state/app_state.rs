@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use scylla::client::session::Session;
 
-use crate::{LeaderboardService, LimitOrderService, PortfolioPerformanceService, PortfolioService, TradeService, UserService};
+use crate::{LeaderboardService, LimitOrderService, MarketDataService, PortfolioPerformanceService, PortfolioService, TradeService, UserService};
 
 
 #[derive(Clone)]
@@ -13,6 +13,7 @@ pub struct AppState {
     pub leaderboard_service: LeaderboardService,
     pub portfolio_performance_service: PortfolioPerformanceService,
     pub limit_order_service: LimitOrderService,
+    pub market_data_service: MarketDataService,
 }
 
 impl AppState {
@@ -24,6 +25,7 @@ impl AppState {
             leaderboard_service: LeaderboardService::new(db.clone()).await?,
             portfolio_performance_service: PortfolioPerformanceService::new(db.clone()).await?,
             limit_order_service: LimitOrderService::new(db.clone()).await?,
+            market_data_service: MarketDataService::new(),
         })
     }
 }

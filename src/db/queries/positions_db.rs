@@ -37,9 +37,6 @@ const GET_ALL_POSITIONS: &str = "SELECT wallet_address, asset, quantity, avg_ent
 
 #[derive(Clone)]
 pub struct PositionsDb {
-    pub(crate) create_position: PreparedStatement,
-    pub(crate) update_position: PreparedStatement,
-    pub(crate) partial_sell: PreparedStatement,
     pub(crate) full_sell: PreparedStatement,
     get_position: PreparedStatement,
     get_all_positions: PreparedStatement,
@@ -48,9 +45,6 @@ pub struct PositionsDb {
 impl PositionsDb {
     pub async fn new(session: &Session) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
-            create_position: session.prepare(CREATE_POSITION).await?,
-            update_position: session.prepare(UPDATE_POSITION).await?,
-            partial_sell: session.prepare(PARTIAL_SELL).await?,
             full_sell: session.prepare(FULL_SELL).await?,
             get_position: session.prepare(GET_POSITION).await?,
             get_all_positions: session.prepare(GET_ALL_POSITIONS).await?,

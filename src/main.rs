@@ -1,3 +1,5 @@
+mod worker;
+
 use axum::{Router, response::IntoResponse, routing::get};
 use paper_trading_backend::{AppConfig, AppState, config::DatabaseConfig, routes};
 use tokio::net::TcpListener;
@@ -6,12 +8,19 @@ use tower_http::cors::CorsLayer;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
+    env_logger::init();
 
     let app_config = AppConfig::from_env();
     let db_config = DatabaseConfig::from_env();
 
     let session = db_config.create_session().await?;
     let app_state = AppState::new(session).await?;
+
+    tokio::spawn(worker::run(
+        app_state.trade_service.clone(),
+        app_state.limit_order_service.clone(),
+        app_state.market_data_service.clone(),
+    ));
 
     let routes = Router::new()
         .route("/health", get(health_check))
