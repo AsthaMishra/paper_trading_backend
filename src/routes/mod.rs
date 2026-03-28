@@ -36,4 +36,6 @@ pub fn routes() -> Router<AppState> {
         .merge(leaderboard::routes())
         .merge(portfolio_performance::routes())
         .merge(closed_positions::routes())
+        .merge(orders::routes())
+        .merge(prices::routes())
 }
