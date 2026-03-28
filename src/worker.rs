@@ -8,11 +8,10 @@ pub async fn run(
     market_data: MarketDataService,
 ) {
     loop {
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        if let Err(e) = 
-        tick(&trade_service, &limit_order_service, &market_data).await {
+        if let Err(e) = tick(&trade_service, &limit_order_service, &market_data).await {
             log::error!("background worker error: {}", e);
         }
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 }
 
@@ -21,12 +20,18 @@ async fn tick(
     limit_order_service: &LimitOrderService,
     market_data: &MarketDataService,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Refresh all watched assets in one Binance call.
+    // This keeps the cache warm so request handlers never need to call Binance themselves.
+    if let Err(e) = market_data.refresh_watched().await {
+        log::warn!("price refresh failed: {}", e);
+    }
+
     let orders: Vec<LimitOrder> = limit_order_service.get_all().await?;
     if orders.is_empty() {
         return Ok(());
     }
 
-    // Collect unique assets across all pending orders
+    // Collect unique assets for any limit order assets not already watched
     let assets: Vec<String> = orders
         .iter()
         .map(|o| o.asset.clone())
@@ -34,8 +39,10 @@ async fn tick(
         .into_iter()
         .collect();
 
+    // get_prices uses the cache — watched assets are already fresh from refresh_watched above.
+    // Any limit order asset not yet watched will be fetched here and added on next watch() call.
     let prices: HashMap<String, f64> = market_data.get_prices(&assets).await
-    .map_err(|e| format!("Exception in getting market prices {}", e))?;
+        .map_err(|e| format!("failed to get market prices: {}", e))?;
 
     let mut executed: HashSet<(String, String)> = HashSet::new();
 
@@ -53,10 +60,10 @@ async fn tick(
         };
 
         let triggered = match order.order_type.as_str() {
-            "buy_limit" => current_price <= order.limit_price,
-            "stop_loss" => current_price <= order.limit_price,
+            "buy_limit"   => current_price <= order.limit_price,
+            "stop_loss"   => current_price <= order.limit_price,
             "take_profit" => current_price >= order.limit_price,
-            _ => false,
+            _             => false,
         };
 
         if !triggered {
@@ -64,30 +71,26 @@ async fn tick(
         }
 
         let result: Result<(), String> = match order.side.as_str() {
-            "buy" => {
-                trade_service
-                    .buy(
-                        order.wallet_address.clone(),
-                        order.asset.clone(),
-                        order.quantity,
-                        current_price,
-                        None,
-                        None,
-                    )
-                    .await
-                    .map_err(|e| e.to_string())
-            }
-            "sell" => {
-                trade_service
-                    .sell(
-                        order.wallet_address.clone(),
-                        order.asset.clone(),
-                        order.quantity,
-                        current_price,
-                    )
-                    .await
-                    .map_err(|e| e.to_string())
-            }
+            "buy" => trade_service
+                .buy(
+                    order.wallet_address.clone(),
+                    order.asset.clone(),
+                    order.quantity,
+                    current_price,
+                    None,
+                    None,
+                )
+                .await
+                .map_err(|e| e.to_string()),
+            "sell" => trade_service
+                .sell(
+                    order.wallet_address.clone(),
+                    order.asset.clone(),
+                    order.quantity,
+                    current_price,
+                )
+                .await
+                .map_err(|e| e.to_string()),
             _ => continue,
         };
 

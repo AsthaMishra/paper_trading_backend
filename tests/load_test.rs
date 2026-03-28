@@ -67,7 +67,39 @@ async fn test_concurrent_user_creation() {
     assert_eq!(failed, 0, "{} user creations failed", failed);
 }
 
-// ── Test 2: 50 concurrent buy trades ────────────────────────────────────────
+// ── Test 2: prices endpoint returns live data ────────────────────────────────
+
+#[tokio::test]
+async fn test_prices_endpoint() {
+    let client = Client::new();
+    let start = Instant::now();
+
+    let res = client
+        .get(format!("{}/prices?tokens=SOL,ETH,BTC", BASE_URL))
+        .send()
+        .await
+        .expect("request failed");
+
+    assert_eq!(res.status().as_u16(), 200, "prices endpoint failed");
+
+    let body: Value = res.json().await.expect("invalid json");
+    assert!(body.get("SOL").is_some(), "SOL price missing from response");
+    assert!(body.get("ETH").is_some(), "ETH price missing from response");
+    assert!(body.get("BTC").is_some(), "BTC price missing from response");
+
+    let sol_price = body["SOL"].as_f64().unwrap();
+    assert!(sol_price > 0.0, "SOL price must be > 0, got {}", sol_price);
+
+    println!(
+        "\nPrices — SOL=${:.2} ETH=${:.2} BTC=${:.2} fetched in {:?}",
+        sol_price,
+        body["ETH"].as_f64().unwrap_or(0.0),
+        body["BTC"].as_f64().unwrap_or(0.0),
+        start.elapsed()
+    );
+}
+
+// ── Test 3: 50 concurrent buy trades (price fetched server-side) ─────────────
 
 #[tokio::test]
 async fn test_concurrent_buy_trades() {
@@ -93,8 +125,8 @@ async fn test_concurrent_buy_trades() {
                     "wallet_address": wallet,
                     "asset": "SOL",
                     "side": "buy",
-                    "quantity": 1.0,
-                    "order_price": 100.0
+                    "quantity": 1.0
+                    // no order_price — server fetches live price from Jupiter
                 }))
                 .send()
                 .await
@@ -124,7 +156,64 @@ async fn test_concurrent_buy_trades() {
     assert_eq!(failed, 0, "{} buy trades failed", failed);
 }
 
-// ── Test 3: 50 concurrent portfolio reads ───────────────────────────────────
+// ── Test 4: portfolio includes unrealized PnL and live price ─────────────────
+
+#[tokio::test]
+async fn test_portfolio_with_unrealized_pnl() {
+    let client = Client::new();
+    let wallet_addr = "pnl_test_wallet";
+
+    create_user(&client, wallet_addr).await.expect("setup failed");
+
+    client
+        .post(format!("{}/trade", BASE_URL))
+        .json(&json!({
+            "wallet_address": wallet_addr,
+            "asset": "SOL",
+            "side": "buy",
+            "quantity": 2.0
+        }))
+        .send()
+        .await
+        .expect("buy failed");
+
+    let res = client
+        .get(format!("{}/portfolio/{}", BASE_URL, wallet_addr))
+        .send()
+        .await
+        .expect("portfolio request failed");
+
+    assert_eq!(res.status().as_u16(), 200);
+
+    let positions: Vec<Value> = res.json().await.expect("invalid json");
+    assert!(!positions.is_empty(), "expected at least one open position");
+
+    let pos = &positions[0];
+    assert_eq!(pos["asset"].as_str().unwrap(), "SOL");
+
+    // Verify enriched fields are present
+    let current_price = pos["current_price"].as_f64()
+        .expect("current_price must be present");
+    let unrealized_pnl = pos["unrealized_pnl"].as_f64()
+        .expect("unrealized_pnl must be present");
+    let avg_entry = pos["avg_entry_price"].as_f64()
+        .expect("avg_entry_price must be present");
+    let quantity = pos["quantity"].as_f64().unwrap();
+
+    let expected_pnl = (current_price - avg_entry) * quantity;
+    assert!(
+        (unrealized_pnl - expected_pnl).abs() < 0.01,
+        "unrealized_pnl={} does not match expected ({} - {}) * {} = {}",
+        unrealized_pnl, current_price, avg_entry, quantity, expected_pnl
+    );
+
+    println!(
+        "\nPortfolio PnL — SOL position: qty={} avg_entry=${:.2} current=${:.2} unrealized_pnl=${:.2}",
+        quantity, avg_entry, current_price, unrealized_pnl
+    );
+}
+
+// ── Test 5: 50 concurrent portfolio reads ────────────────────────────────────
 
 #[tokio::test]
 async fn test_concurrent_portfolio_reads() {
@@ -140,8 +229,7 @@ async fn test_concurrent_portfolio_reads() {
                 "wallet_address": w,
                 "asset": "SOL",
                 "side": "buy",
-                "quantity": 1.0,
-                "order_price": 100.0
+                "quantity": 1.0
             }))
             .send()
             .await
@@ -160,19 +248,28 @@ async fn test_concurrent_portfolio_reads() {
                 .send()
                 .await
                 .expect("request failed");
-            (i, res.status().as_u16())
+            let status = res.status().as_u16();
+            let body: Vec<Value> = res.json().await.unwrap_or_default();
+            // Verify response shape
+            let has_unrealized_pnl = body.first()
+                .map(|p| p.get("unrealized_pnl").is_some())
+                .unwrap_or(true); // empty portfolio is also valid
+            (i, status, has_unrealized_pnl)
         });
     }
 
     let mut success = 0;
     let mut failed = 0;
     while let Some(result) = set.join_next().await {
-        let (i, status) = result.unwrap();
-        if status == 200 {
+        let (i, status, has_unrealized_pnl) = result.unwrap();
+        if status == 200 && has_unrealized_pnl {
             success += 1;
         } else {
             failed += 1;
-            println!("  [portfolio {}] failed with status {}", i, status);
+            println!(
+                "  [portfolio {}] status={} unrealized_pnl_present={}",
+                i, status, has_unrealized_pnl
+            );
         }
     }
 
@@ -183,13 +280,13 @@ async fn test_concurrent_portfolio_reads() {
     assert_eq!(failed, 0, "{} portfolio reads failed", failed);
 }
 
-// ── Test 4: Mixed load — create + trade + read simultaneously ────────────────
+// ── Test 6: Mixed load — create + trade + prices simultaneously ───────────────
 
 #[tokio::test]
 async fn test_mixed_concurrent_load() {
     let client = Client::new();
 
-    // Pre-create users for read/trade tasks
+    // Pre-create users for trade tasks
     for i in 0..CONCURRENT_REQUESTS {
         create_user(&client, &wallet(i, "mixed_user"))
             .await
@@ -201,7 +298,6 @@ async fn test_mixed_concurrent_load() {
 
     for i in 0..CONCURRENT_REQUESTS {
         let client = client.clone();
-        // Rotate through 3 different request types
         match i % 3 {
             0 => {
                 // New user creation
@@ -217,7 +313,7 @@ async fn test_mixed_concurrent_load() {
                 });
             }
             1 => {
-                // Buy trade
+                // Buy trade — no order_price, server fetches from Jupiter
                 let w = wallet(i, "mixed_user");
                 set.spawn(async move {
                     let res = client
@@ -226,8 +322,7 @@ async fn test_mixed_concurrent_load() {
                             "wallet_address": w,
                             "asset": "SOL",
                             "side": "buy",
-                            "quantity": 0.5,
-                            "order_price": 100.0
+                            "quantity": 0.5
                         }))
                         .send()
                         .await
@@ -236,15 +331,14 @@ async fn test_mixed_concurrent_load() {
                 });
             }
             _ => {
-                // Portfolio read
-                let w = wallet(i, "mixed_user");
+                // Live price fetch
                 set.spawn(async move {
                     let res = client
-                        .get(format!("{}/portfolio/{}", BASE_URL, w))
+                        .get(format!("{}/prices?tokens=SOL", BASE_URL))
                         .send()
                         .await
                         .expect("request failed");
-                    (i, "portfolio_read", res.status().as_u16())
+                    (i, "price_fetch", res.status().as_u16())
                 });
             }
         }

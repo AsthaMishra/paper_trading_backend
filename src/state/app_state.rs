@@ -18,6 +18,11 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(db: Arc<Session>) -> Result<Self, Box<dyn std::error::Error>> {
+        let market_data_service = MarketDataService::new();
+
+        // Pre-warm common assets so the cache is hot before the first request arrives.
+        market_data_service.warm_up(&["SOL", "ETH", "BTC", "BNB"]).await;
+
         Ok(Self {
             user_service: UserService::new(db.clone()).await?,
             trade_service: TradeService::new(db.clone()).await?,
@@ -25,7 +30,7 @@ impl AppState {
             leaderboard_service: LeaderboardService::new(db.clone()).await?,
             portfolio_performance_service: PortfolioPerformanceService::new(db.clone()).await?,
             limit_order_service: LimitOrderService::new(db.clone()).await?,
-            market_data_service: MarketDataService::new(),
+            market_data_service,
         })
     }
 }

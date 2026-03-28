@@ -15,7 +15,6 @@ pub struct TradeRequest {
     pub asset: String,
     pub side: String,
     pub quantity: f64,
-    pub order_price: f64,
     pub stop_loss: Option<f64>,
     pub take_profit: Option<f64>,
 }
@@ -47,15 +46,18 @@ pub async fn execute_trade(
             "quantity must be greater than 0".to_string(),
         ));
     }
-    if req.order_price <= 0.0 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "order_price must be greater than 0".to_string(),
-        ));
-    }
     if req.asset.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "asset cannot be empty".to_string()));
     }
+
+    // Register the asset so the worker keeps its price fresh every 5s.
+    state.market_data_service.watch(&req.asset).await;
+
+    let live_price = state
+        .market_data_service
+        .get_price(&req.asset)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("failed to fetch price for {}: {}", req.asset, e)))?;
 
     let result = match req.side.as_str() {
         "buy" => {
@@ -65,7 +67,7 @@ pub async fn execute_trade(
                     req.wallet_address,
                     req.asset,
                     req.quantity,
-                    req.order_price,
+                    live_price,
                     req.stop_loss,
                     req.take_profit,
                 )
@@ -78,7 +80,7 @@ pub async fn execute_trade(
                     req.wallet_address,
                     req.asset,
                     req.quantity,
-                    req.order_price,
+                    live_price,
                 )
                 .await
         }

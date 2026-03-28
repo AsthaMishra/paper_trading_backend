@@ -30,7 +30,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/leaderboard", routes::leaderboard::routes())
         .nest("/portfolio-performance", routes::portfolio_performance::routes())
         .nest("/closed-positions", routes::closed_positions::routes())
-        .nest("/orders", routes::orders::routes());
+        .nest("/orders", routes::orders::routes())
+        .nest("/prices", routes::prices::routes());
 
     let app = Router::new()
         .merge(routes)

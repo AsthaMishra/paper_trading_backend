@@ -23,6 +23,9 @@ pub use closed_positions::*;
 pub mod orders;
 pub use orders::*;
 
+pub mod prices;
+pub use prices::*;
+
 use crate::AppState;
 
 pub fn routes() -> Router<AppState> {

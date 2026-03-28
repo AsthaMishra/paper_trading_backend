@@ -3,7 +3,7 @@ use std::{error::Error, sync::Arc};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use scylla::{client::session::Session, response::PagingState};
 
-use crate::{FullSellExtra, Leaderboard, LeaderboardDb, LimitOrder, LimitOrdersDb, PositionsDb, TradeDB, TradeData, UserDb};
+use crate::{FullSellExtra, Leaderboard, LeaderboardDb, LimitOrder, LimitOrdersDb, PortfolioPerformanceDB, PositionsDb, TradeDB, TradeData, UserDb};
 
 const FEE_RATE: f64 = 0.001; // 0.1%
 
@@ -15,6 +15,7 @@ pub struct TradeService {
     trade_db: TradeDB,
     leaderboard_db: LeaderboardDb,
     limit_orders_db: LimitOrdersDb,
+    portfolio_performance_db: PortfolioPerformanceDB,
 }
 
 impl TradeService {
@@ -25,6 +26,7 @@ impl TradeService {
             trade_db: TradeDB::new(&db).await?,
             leaderboard_db: LeaderboardDb::new(&db).await?,
             limit_orders_db: LimitOrdersDb::new(&db).await?,
+            portfolio_performance_db: PortfolioPerformanceDB::new(&db).await?,
             db,
         })
     }
@@ -111,6 +113,10 @@ impl TradeService {
                 created_at: now,
             }).await?;
         }
+
+        self.portfolio_performance_db
+            .snapshot(&self.db, wallet_address.clone(), data.new_balance, data.total_realized_pnl)
+            .await?;
 
         Ok(())
     }
@@ -205,6 +211,12 @@ impl TradeService {
                     wallet_address: wallet_address.clone(),
                 },
             )
+            .await?;
+
+        self.portfolio_performance_db
+            .snapshot
+            (&self.db, wallet_address.clone(),
+                 data.new_balance, new_total_pnl)
             .await?;
 
         Ok(())
