@@ -14,7 +14,7 @@ const CREATE_USER_QUERY: &str = "INSERT INTO paper_trading.users (
      winning_trades,
      best_trade,
      worst_trade
-) VALUES (?,?,?,?,?,?,?,?,?)";
+) VALUES (?,?,?,?,?,?,?,?,?) IF NOT EXISTS";
 
 const GET_USER_QUERY: &str = "SELECT wallet_address, starting_balance, current_balance, total_realized_pnl, created_at, total_trades, winning_trades, best_trade, worst_trade FROM paper_trading.users WHERE wallet_address = ?";
 
